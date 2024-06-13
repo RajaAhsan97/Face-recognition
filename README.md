@@ -1,12 +1,10 @@
-This repository contains different techniques for face recognition on the largest selfie image. Prior to face recognition faces in the image are detected using YuNet face detector - a deep
-learning neural network model. Faces in the image are recognized by matching the features of detected faces with the target faces. For feature match DNN model and statistical methods are used 
-as mentioned below:
+This repository contains different techniques for face recognition on the largest selfie image. Prior to face recognition faces in the image are detected using YuNet face detector - a deep learning neural network model. Faces in the image are recognized by matching the features of detected faces with the target faces. For feature match DNN model and statistical methods are used as mentioned below:
 
 1. SFace
 2. SSIM
 3. SIFT
 
-Where the SSIM and SIFT are the statistical methods.
+Where the SSIM and SIFT are the statistical methods. Recognized faces are represented by green outline whereas unrecognized faces are represented by red outline boxes
 
 .py file description
 
