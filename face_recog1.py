@@ -1,19 +1,9 @@
 """
     For detection of Face region in the Image YuNet face detector is used, and for face recognition
-    SFace model is used...
-
-    If features of the face image is found in the test image, then it is designated as recognized face.
-    for this the features of both images are matched using L2 or Cosine match score
-
-    1. L2 score
-            for two identical images the score will be close to 0
-    2. Cosine score
-            for two identical, images the score will be closer to 1 
-
-    Conclusion:
-        feature match using cosine and simple show same score
-
-        *   for higher resolution (149x191) of face region L2 distance score is < 0.05 
+    SSIM is used which compare the features of the target face image with the detected faces. For perfect
+    match of features of the two images the score will be 1. Thus, I have defined the SSIM score threshold to
+    0.8, if the computed score of the target and the detected face region is > SSIM score threshold then the detected face is
+    designated as the recognized.
 """
 
 import os
@@ -21,9 +11,10 @@ import argparse
 import cv2
 import numpy as np
 import time
+from skimage.metrics import structural_similarity as SSIM
 
 print("*********************************")
-print("Face Recognition using SFace")
+print("Face Recognition using SSIM Index")
 print("*********************************")
 
 base_dir = os.path.dirname(__file__)
@@ -46,19 +37,15 @@ for directory in base_dir_fldr:
 # path to models files
 parser = argparse.ArgumentParser()
 parser.add_argument("--Face_Detection_YuNet", type=str, default=YuNet, help="Path to face detection model (downloaded from opencvzoo/models/face_detection_yunet)")
-parser.add_argument("--Face_Recognition_SFace", type=str, default=Sface, help="Path to face recognition model (downloaded from opencvzoo/models/face_recognition_sface)")
 parser.add_argument("--Face_Detection_score_thres", type=float, default=0.85, help="filter the faces with score < score threshold")
 parser.add_argument("--Face_Detection_nms_thres", type=float, default=0.3, help="Suppress the k bboxes >= nms threshold")
 parser.add_argument("--Face_Detection_Top_k", type=int, default=5000, help="keep k bboxes before nms")
-parser.add_argument("--Face_Recignition_cosine_simil_thres", type=float, default=0.8, help="Indicate the detected face if the features of both face images are similar, which is represented by similarity score >0.9")
+parser.add_argument("--SSIM_score_threshold", type=float, default=0.8, help="Indicate recognized faces with SSIM score > SSIM_score_threshold")
 args = parser.parse_args()
 
 
 # Initialize YuNet face Detector model instance
 facedetector = cv2.FaceDetectorYN_create(args.Face_Detection_YuNet, "", (0,0), args.Face_Detection_score_thres, args.Face_Detection_nms_thres, args.Face_Detection_Top_k)
-
-# Initialize Sface Face Recognizer model instance
-facerecognizer = cv2.FaceRecognizerSF.create(args.Face_Recognition_SFace, "")
 
 
 # load target faces and extract their features using SFace model which will be utilzed to recognize faces in the given sample image
@@ -68,7 +55,7 @@ tar_fc_fdr_pth = os.path.join(base_dir, tar_fc_fdr_nm)
 tar_faces = os.listdir(tar_fc_fdr_pth)
 target_faces = len(tar_faces)
 
-tar_img_features = {}
+tar_imgs = {}
 for faces in tar_faces:
     image_path = os.path.join(tar_fc_fdr_pth, faces)
 
@@ -78,13 +65,13 @@ for faces in tar_faces:
 
     channels = 1 if len(image_resol) == 2 else image_resol[-1]
 
-    if channels == 1:
-        image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+    if channels == 3:
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     elif channels == 4:
-        image = cv2.cvtColor(image, cv2.COLOR_BGRA2BGR)
+        image = cv2.cvtColor(image, cv2.COLOR_BGRA2GRAY)
 
     image_nm = image_path.rsplit("\\")[-1]
-    tar_img_features[image_nm] = facerecognizer.feature(image)
+    tar_imgs[image_nm] = image
 
 
 # Load sample image in which the faces will be recognized
@@ -109,50 +96,38 @@ face_detect_end_tm = time.time()
 faces = faces if faces is not None else []
 
 img2 = image2.copy()
-tar_img_feat = tar_img_features.copy()
+tar_images = tar_imgs.copy()
 feat_match_cnt = 0
 
-#--------------------
-Feat_extract_tm = {}
-Feat_mtch_tm = {}
-cnt = 1
-# ------------------
 
-# for the detected faces extract the features match them with the target faces features, if match score >0.9 then the face as recognized
-# recognized faces are enclosed in green boxes
+"""
+    For SSIM the dimensions of the two images must be same, in my case the resolutions of all target and detected face images are
+    different. Thus to compute the similarity score of two same resoultion images, I have extracted the target images whose resolution
+    matches with the detected face image and then used the extracted images for similarity measure with the detected face region.
+"""
 faces_rec_start_tm = time.time()
 for face in faces:
     fc, confidence_score = list(face[:-1].astype('i')), str(np.round(face[-1], 3))
 
     cv2.rectangle(image2, (fc[0], fc[1]), (fc[0]+fc[2], fc[1]+fc[3]), (0,0,255), 2)
 
-    #aligned_face = facerecognizer.alignCrop(image2, face)
-    feat_extrt_strt_tm = time.time()
-    features = facerecognizer.feature(img2[fc[1]:fc[1]+fc[3], fc[0]:fc[0]+fc[2]])
-    feat_extrt_end_tm = time.time()
+    crop_face = cv2.cvtColor(img2[fc[1]:fc[1]+fc[3], fc[0]:fc[0]+fc[2]], cv2.COLOR_BGR2GRAY)
 
-    # -------------------------
-    Feat_extract_tm[cnt] = np.round(feat_extrt_end_tm - feat_extrt_strt_tm, 4)
-    # -------------------------
+    match_faces_res = {}
+    for k in tar_images.keys():
+        if np.shape(tar_images[k]) == np.shape(crop_face):
+            match_faces_res[k] = tar_images[k]
 
-    feat_mtch_strt_tm = time.time()
-    for k in tar_img_feat.keys():
-        tar_features = tar_img_feat[k]
-        cosine_score = facerecognizer.match(features, tar_features, cv2.FaceRecognizerSF_FR_COSINE)
-
-        if cosine_score >= args.Face_Recignition_cosine_simil_thres:
+    for KEY in match_faces_res.keys():
+        tar_image = match_faces_res[KEY]
+        SSIM_score = SSIM(crop_face, tar_image)
+        if SSIM_score > args.SSIM_score_threshold:        
             cv2.rectangle(image2, (fc[0], fc[1]), (fc[0]+fc[2], fc[1]+fc[3]), (0,255,0), 2)
             cv2.putText(image2, confidence_score, (fc[0],fc[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 1)        
-            tar_img_feat.pop(k)
+            tar_images.pop(KEY)
             feat_match_cnt += 1
+            match_faces_res = {}   
             break
-    feat_mtch_end_tm = time.time()
-
-    # -------------------------
-    Feat_mtch_tm[cnt] = np.round(feat_mtch_end_tm - feat_mtch_strt_tm, 4)
-    cnt += 1
-    # -------------------------
-    
 faces_rec_end_tm = time.time()
 
 faces_detect_time = np.round(face_detect_end_tm - face_detect_strt_tm, 4)
@@ -165,4 +140,4 @@ print("Target faces: ", target_faces)
 print("Faces Recognized: ", feat_match_cnt)
 print("------------------------------------------")
 
-cv2.imwrite("face recognized.jpg", image2)
+cv2.imwrite("face recognized_SSIM.jpg", image2)
