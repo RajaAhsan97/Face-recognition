@@ -50,7 +50,7 @@ parser.add_argument("--Face_Recognition_SFace", type=str, default=Sface, help="P
 parser.add_argument("--Face_Detection_score_thres", type=float, default=0.85, help="filter the faces with score < score threshold")
 parser.add_argument("--Face_Detection_nms_thres", type=float, default=0.3, help="Suppress the k bboxes >= nms threshold")
 parser.add_argument("--Face_Detection_Top_k", type=int, default=5000, help="keep k bboxes before nms")
-parser.add_argument("--Face_Recignition_cosine_simil_thres", type=float, default=0.8, help="Indicate the detected face if the features of both face images are similar, which is represented by similarity score >0.9")
+parser.add_argument("--Face_Recognition_cosine_simil_thres", type=float, default=0.8, help="Indicate the detected face if the features of both face images are similar, which is represented by similarity score >0.9")
 args = parser.parse_args()
 
 
@@ -140,7 +140,7 @@ for face in faces:
         tar_features = tar_img_feat[k]
         cosine_score = facerecognizer.match(features, tar_features, cv2.FaceRecognizerSF_FR_COSINE)
 
-        if cosine_score >= args.Face_Recignition_cosine_simil_thres:
+        if cosine_score >= args.Face_Recognition_cosine_simil_thres:
             cv2.rectangle(image2, (fc[0], fc[1]), (fc[0]+fc[2], fc[1]+fc[3]), (0,255,0), 2)
             cv2.putText(image2, confidence_score, (fc[0],fc[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 1)        
             tar_img_feat.pop(k)
