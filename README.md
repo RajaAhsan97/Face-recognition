@@ -23,5 +23,9 @@ Note:
             > SSIM score threshold then the detected faces is marked as recognized.
       iii.  For SIFT the similarity between two images is measured by computing the L2_Norm distances between the common features in the two images. For a perfect feature match the distance is 
             small and for the two images perfect match features are further filtered by using LOWE distance ratio criteria (ref: https://docs.opencv.org/3.4/d5/d6f/tutorial_feature_flann_matcher.html).
-            
+
+
+largest selfie image
+![selfie](https://github.com/RajaAhsan97/Face-recognition/assets/155144523/742abbb0-86d2-4756-b4ed-9f21adf3dfc2)
+
       
